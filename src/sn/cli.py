@@ -17,7 +17,7 @@ from .version import __version__
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="grc")
+    parser = argparse.ArgumentParser(prog="sn")
     parser.add_argument(
         "-V", "--version", action="version", version=f"%(prog)s {__version__}"
     )

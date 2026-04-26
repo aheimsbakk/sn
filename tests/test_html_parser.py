@@ -1,6 +1,6 @@
 import unittest
 
-from grc.html_parser import parse_html_transcript
+from sn.html_parser import parse_html_transcript
 
 
 SAMPLE_HTML = """

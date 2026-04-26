@@ -1,6 +1,6 @@
 import unittest
 
-from grc.normalize import detect_and_decode, normalize_speaker_line, slugify
+from sn.normalize import detect_and_decode, normalize_speaker_line, slugify
 
 
 class NormalizeTests(unittest.TestCase):

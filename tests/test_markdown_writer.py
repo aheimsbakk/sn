@@ -2,8 +2,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from grc.markdown_writer import build_markdown, write_markdown
-from grc.models import TranscriptRecord
+from sn.markdown_writer import build_markdown, write_markdown
+from sn.models import TranscriptRecord
 
 
 class MarkdownWriterTests(unittest.TestCase):

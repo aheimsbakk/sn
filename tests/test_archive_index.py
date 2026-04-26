@@ -1,6 +1,6 @@
 import unittest
 
-from grc.archive_index import discover_yearly_archive_urls, parse_archive_entries
+from sn.archive_index import discover_yearly_archive_urls, parse_archive_entries
 
 
 SAMPLE_ARCHIVE = """

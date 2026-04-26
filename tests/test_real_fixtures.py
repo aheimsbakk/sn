@@ -1,10 +1,10 @@
 import unittest
 from pathlib import Path
 
-from grc.archive_index import parse_archive_entries
-from grc.html_parser import parse_html_transcript
-from grc.normalize import detect_and_decode
-from grc.text_parser import parse_text_transcript
+from sn.archive_index import parse_archive_entries
+from sn.html_parser import parse_html_transcript
+from sn.normalize import detect_and_decode
+from sn.text_parser import parse_text_transcript
 
 
 FIXTURES = Path(__file__).parent / "fixtures"

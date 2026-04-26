@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from grc.status import (
+from sn.status import (
     list_non_present,
     render_status_json,
     render_status_text,

@@ -25,8 +25,8 @@ from pathlib import Path
 root = Path.cwd()
 bump_type = sys.argv[1]
 pyproject_path = root / "pyproject.toml"
-version_path = root / "src" / "grc" / "version.py"
-http_path = root / "src" / "grc" / "http.py"
+version_path = root / "src" / "sn" / "version.py"
+http_path = root / "src" / "sn" / "http.py"
 blueprint_path = root / "BLUEPRINT.md"
 
 pyproject_text = pyproject_path.read_text(encoding="utf-8")
@@ -56,7 +56,7 @@ def replace_version(path: Path, pattern: str, replacement: str) -> None:
 
 replace_version(pyproject_path, r'^version = ".*"$', f'version = "{new_version}"')
 replace_version(version_path, r'^__version__ = ".*"$', f'__version__ = "{new_version}"')
-replace_version(http_path, r'^USER_AGENT = ".*"$', f'USER_AGENT = "grc/{new_version} (+https://www.grc.com/)"')
+replace_version(http_path, r'^USER_AGENT = ".*"$', f'USER_AGENT = "sn/{new_version} (+https://www.grc.com/)"')
 replace_version(blueprint_path, r'^- current version: `.*`$', f'- current version: `{new_version}`')
 
 print(new_version)

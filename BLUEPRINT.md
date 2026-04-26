@@ -1,4 +1,4 @@
-# Blueprint: `grc` Security Now transcript archiver
+# Blueprint: `sn` Security Now transcript archiver
 
 ## Goal
 
@@ -6,8 +6,8 @@ Build a small Python CLI that syncs Security Now podcast transcripts from GRC in
 
 This phase covers two subcommands:
 
-- `grc sync`
-- `grc status`
+- `sn sync`
+- `sn status`
 
 Search will be added later.
 
@@ -19,7 +19,7 @@ Search will be added later.
 - Source code under `src/`
 - Tests under `tests/`
 - Tests must run fully offline
-- CLI executable must be named `grc`
+- CLI executable must be named `sn`
 - CLI must support:
   - `--help` / `-h`
   - `--version` / `-V`
@@ -196,9 +196,9 @@ Rules:
 
 ---
 
-## Scope of `grc sync`
+## Scope of `sn sync`
 
-`grc sync` should:
+`sn sync` should:
 
 1. Read the main archive page at `https://www.grc.com/securitynow.htm`
 2. Discover linked yearly archive pages
@@ -211,7 +211,7 @@ Rules:
 9. Mark missing transcripts and failures in local state
 10. Retry missing transcripts on later runs
 
-By default, `grc sync` should inspect the existing Markdown files in the archive destination and skip episodes that are already stored there. Rewriting changed remote transcripts is a `--force` behavior.
+By default, `sn sync` should inspect the existing Markdown files in the archive destination and skip episodes that are already stored there. Rewriting changed remote transcripts is a `--force` behavior.
 
 When `--force` is used, the tool should first compare a lightweight metadata-based checksum derived from response headers such as `ETag`, `Last-Modified`, and `Content-Length`. If that checksum matches the `source_sha` stored in the existing Markdown front matter, the tool should skip the full transcript download and keep the existing local file.
 
@@ -222,7 +222,7 @@ When `--force` is used, the tool should first compare a lightweight metadata-bas
 ## Root command
 
 ```text
-grc [global options] <command> [command options]
+sn [global options] <command> [command options]
 ```
 
 ### Global options
@@ -238,16 +238,16 @@ grc [global options] <command> [command options]
 ### First command
 
 ```text
-grc sync
+sn sync
 ```
 
 ### Second command
 
 ```text
-grc status
+sn status
 ```
 
-### `grc sync` options
+### `sn sync` options
 
 - `--year YYYY`
   - sync only one archive year
@@ -269,14 +269,14 @@ grc status
 - `--source-preference {auto,txt,html}`
   - default: `auto`
 
-### `grc status` options
+### `sn status` options
 
 - `--missing`
   - show only episodes in non-present states
 - `--json`
   - machine-readable output
 
-### `grc status` output
+### `sn status` output
 
 At minimum, report:
 
@@ -305,13 +305,13 @@ When listing non-present episodes, distinguish clearly between:
 
 ### Exit codes
 
-For `grc sync`:
+For `sn sync`:
 
 - `0`: all requested work completed successfully
 - `2`: command completed, but one or more episodes ended in `remote_missing`, `fetch_error`, or `parse_error`
 - `1`: fatal command, configuration, or runtime error
 
-For `grc status`:
+For `sn status`:
 
 - `0`: archive is readable and has no non-present states
 - `2`: archive is readable, but contains `remote_missing`, `fetch_error`, or `parse_error` entries
@@ -398,7 +398,7 @@ The archive directory itself is the source of truth. The tool must scan stored M
 
 ```text
 src/
-  grc/
+  sn/
     __init__.py
     cli.py
     version.py
@@ -442,7 +442,7 @@ tests/
 
 Notes:
 
-- `__main__.py` is not required in v1 because the console entry point is `grc`
+- `__main__.py` is not required in v1 because the console entry point is `sn`
 - `sync.py` now emits simple verbose progress lines directly during archive and transcript fetches
 
 ---
@@ -451,8 +451,8 @@ Notes:
 
 - project managed by `uv`
 - standard `pyproject.toml`
-- console script entry point named `grc`
-- package import name: `grc`
+- console script entry point named `sn`
+- package import name: `sn`
 
 ### Planned runtime stack
 
@@ -468,8 +468,8 @@ Prefer standard library functionality by default, but use `lxml` and `PyYAML` wh
 ### Implemented packaging details
 
 - build backend: `setuptools`
-- package name: `grc`
-- current version: `1.0.1`
+- package name: `sn`
+- current version: `1.2.0`
 - editable install works with `uv pip install -e .`
 - tests run with `uv run python -m unittest discover -s tests`
 
@@ -596,7 +596,7 @@ These files were fetched politely from `grc.com` and are used only for offline t
 
 ## First implementation milestone
 
-Build working `grc sync` and `grc status` commands that can:
+Build working `sn sync` and `sn status` commands that can:
 
 - install with `uv`
 - sync a selected archive year or all discovered years

@@ -3,10 +3,10 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from grc.archive_state import load_archive_state
-from grc.http import FetchError, RemoteMissingError
-from grc.models import EpisodeIndexEntry, FetchResult, RemoteMetadata
-from grc.sync import (
+from sn.archive_state import load_archive_state
+from sn.http import FetchError, RemoteMissingError
+from sn.models import EpisodeIndexEntry, FetchResult, RemoteMetadata
+from sn.sync import (
     discover_episode_entries,
     fetch_and_parse_entry,
     plan_sync,

@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from grc.archive_state import load_archive_state
+from sn.archive_state import load_archive_state
 
 
 class ArchiveStateTests(unittest.TestCase):

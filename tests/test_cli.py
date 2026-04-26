@@ -9,7 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from grc import cli
+from sn import cli
 
 
 class CliTests(unittest.TestCase):
@@ -18,17 +18,18 @@ class CliTests(unittest.TestCase):
         with pyproject_path.open("rb") as handle:
             pyproject = tomllib.load(handle)
 
-        self.assertEqual(pyproject["project"]["name"], "grc")
+        self.assertEqual(pyproject["project"]["name"], "sn")
 
-    def test_console_script_points_to_grc_package(self) -> None:
+    def test_console_script_points_to_sn_package(self) -> None:
         pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
         with pyproject_path.open("rb") as handle:
             pyproject = tomllib.load(handle)
 
-        self.assertEqual(pyproject["project"]["scripts"]["grc"], "grc.cli:main")
+        self.assertEqual(pyproject["project"]["scripts"]["sn"], "sn.cli:main")
 
     def test_legacy_grc_sync_package_is_removed(self) -> None:
         self.assertIsNone(importlib.util.find_spec("grc_sync"))
+        self.assertIsNone(importlib.util.find_spec("grc"))
 
     def test_version_option(self) -> None:
         with self.assertRaises(SystemExit) as context:
@@ -52,7 +53,7 @@ class CliTests(unittest.TestCase):
         with (
             TemporaryDirectory() as temp_dir,
             redirect_stdout(buffer),
-            patch("grc.cli.sync_archive", return_value=(0, {"episodes": {}})) as mocked,
+            patch("sn.cli.sync_archive", return_value=(0, {"episodes": {}})) as mocked,
         ):
             exit_code = cli.main(["-d", temp_dir, "sync", "--dry-run"])
         self.assertEqual(exit_code, 0)

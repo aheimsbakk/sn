@@ -1,6 +1,6 @@
 import unittest
 
-from grc.text_parser import parse_text_transcript
+from sn.text_parser import parse_text_transcript
 
 
 SAMPLE_TEXT = """SERIES: Security Now!
