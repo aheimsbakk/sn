@@ -7,8 +7,8 @@ from typing import Any
 NON_PRESENT_STATUSES = ("remote_missing", "fetch_error", "parse_error")
 
 
-def summarize_manifest(manifest: dict[str, Any]) -> dict[str, int]:
-    episodes = manifest.get("episodes", {})
+def summarize_archive_state(archive_state: dict[str, Any]) -> dict[str, int]:
+    episodes = archive_state.get("episodes", {})
     if not isinstance(episodes, dict):
         episodes = {}
     summary = {
@@ -30,8 +30,8 @@ def summarize_manifest(manifest: dict[str, Any]) -> dict[str, int]:
     return summary
 
 
-def list_non_present(manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    episodes = manifest.get("episodes", {})
+def list_non_present(archive_state: dict[str, Any]) -> list[dict[str, Any]]:
+    episodes = archive_state.get("episodes", {})
     if not isinstance(episodes, dict):
         episodes = {}
     results = [

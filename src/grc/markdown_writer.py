@@ -44,11 +44,11 @@ def build_markdown(record: TranscriptRecord) -> str:
 
 def target_markdown_path(archive_root: Path, record: TranscriptRecord) -> Path:
     slug = slugify(record.title)
-    return archive_root / "transcripts" / f"sn-{record.episode:04d}-{slug}.md"
+    return archive_root / f"sn-{record.episode:04d}-{slug}.md"
 
 
 def write_markdown(archive_root: Path, record: TranscriptRecord) -> Path:
     path = target_markdown_path(archive_root, record)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    archive_root.mkdir(parents=True, exist_ok=True)
     path.write_text(build_markdown(record), encoding="utf-8", newline="\n")
     return path

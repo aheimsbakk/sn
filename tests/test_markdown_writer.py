@@ -36,5 +36,6 @@ class MarkdownWriterTests(unittest.TestCase):
         )
         with TemporaryDirectory() as temp_dir:
             path = write_markdown(Path(temp_dir), record)
+            self.assertEqual(path.parent, Path(temp_dir))
             self.assertTrue(path.name.startswith("sn-0007-lucky-seven"))
             self.assertTrue(path.exists())

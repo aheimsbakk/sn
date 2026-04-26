@@ -37,20 +37,8 @@ class CliTests(unittest.TestCase):
 
     def test_status_json_output(self) -> None:
         with TemporaryDirectory() as temp_dir:
-            manifest_dir = Path(temp_dir) / ".grc-sync"
-            manifest_dir.mkdir()
-            (manifest_dir / "manifest.json").write_text(
-                json.dumps(
-                    {
-                        "episodes": {
-                            "1": {
-                                "episode": 1,
-                                "status": "present",
-                                "local_path": "transcripts/sn-0001.md",
-                            }
-                        }
-                    }
-                ),
+            (Path(temp_dir) / "sn-0001-as-the-show-begins.md").write_text(
+                "---\nseries: Security Now!\nepisode: 1\ntitle: As The Show Begins\n---\n\n# Security Now! Episode 1: As The Show Begins\n",
                 encoding="utf-8",
             )
             buffer = io.StringIO()

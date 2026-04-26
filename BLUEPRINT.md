@@ -211,9 +211,9 @@ Rules:
 9. Mark missing transcripts and failures in local state
 10. Retry missing transcripts on later runs
 
-By default, `grc sync` should not re-fetch already archived transcripts to detect upstream edits. Rewriting changed remote transcripts is a `--force` behavior.
+By default, `grc sync` should inspect the existing Markdown files in the archive destination and skip episodes that are already stored there. Rewriting changed remote transcripts is a `--force` behavior.
 
-When `--force` is used, the tool should first compare a lightweight metadata-based checksum derived from response headers such as `ETag`, `Last-Modified`, and `Content-Length`. If that checksum matches the stored value, the tool should skip the full transcript download and keep the existing local file.
+When `--force` is used, the tool should first compare a lightweight metadata-based checksum derived from response headers such as `ETag`, `Last-Modified`, and `Content-Length`. If that checksum matches the `source_sha` stored in the existing Markdown front matter, the tool should skip the full transcript download and keep the existing local file.
 
 ---
 
@@ -256,7 +256,7 @@ grc status
 - `--latest N`
   - sync only the most recent N episodes
 - `--force`
-  - re-download and rewrite episodes even if already present
+  - re-check existing episodes and rewrite only when the remote metadata checksum changes
 - `--dry-run`
   - show what would be fetched and written
 - `--pause-seconds FLOAT`
@@ -345,7 +345,7 @@ The tool must avoid behaving like a crawler.
 Default sync should:
 
 - fetch archive index pages
-- compare discovered episodes with local manifest state
+- compare discovered episodes with stored Markdown files and their front matter
 - download only missing episodes unless `--force` is used
 - retry episodes previously marked missing
 - avoid checking already archived transcripts for remote changes unless `--force` is used
@@ -372,7 +372,7 @@ The source files may use different encodings, so decoding must use raw bytes and
 - normalize newlines
 - trim malformed control characters where safe
 - always write local files as UTF-8 without BOM
-- record the detected original encoding in front matter and manifest state
+- record the detected original encoding in front matter
 
 Reason:
 
@@ -387,32 +387,11 @@ Given `--archive-dest /path/to/archive`, store:
 
 ```text
 /path/to/archive/
-  transcripts/
-    sn-0001-as-the-worm-turns-the-first-internet-worms-of-2005.md
-    sn-1074-what-mythos-means.md
-  .grc-sync/
-    manifest.json
+  sn-0001-as-the-worm-turns-the-first-internet-worms-of-2005.md
+  sn-1074-what-mythos-means.md
 ```
 
-### Manifest purpose
-
-The manifest is local sync state, not search content.
-
-It should track:
-
-- episode number
-- title slug
-- transcript URL
-- chosen source format
-- original encoding
-- local file path
-- fetched timestamp
-- source metadata checksum (`source_sha`)
-- sync status (`present`, `remote_missing`, `fetch_error`, `parse_error`)
-- last retry timestamp
-- last error summary
-
-The same `source_sha` should also be written into Markdown front matter so stored files retain their own lightweight remote change marker.
+The archive directory itself is the source of truth. The tool must scan stored Markdown files, read their front matter, and use the actual files on disk to determine local state rather than relying on a separate manifest file.
 
 ---
 
@@ -431,7 +410,7 @@ src/
     html_parser.py
     normalize.py
     markdown_writer.py
-    manifest.py
+    archive_state.py
     sync.py
     status.py
 tests/
@@ -444,7 +423,7 @@ tests/
   test_html_parser.py
   test_normalize.py
   test_markdown_writer.py
-  test_manifest.py
+  test_archive_state.py
   test_sync.py
   test_status.py
 ```
@@ -458,7 +437,7 @@ tests/
 - `html_parser.py`: parse transcript HTML fallback pages
 - `normalize.py`: encoding detection, cleanup, Unicode normalization
 - `markdown_writer.py`: front matter and Markdown rendering
-- `manifest.py`: read and write local sync state
+- `archive_state.py`: scan stored Markdown files and derive local archive state from front matter
 - `sync.py`: orchestration only
 - `status.py`: summarize local archive coverage and missing transcripts
 
@@ -491,7 +470,7 @@ Prefer standard library functionality by default, but use `lxml` and `PyYAML` wh
 
 - build backend: `setuptools`
 - package name: `grc`
-- current version: `0.4.0`
+- current version: `0.5.0`
 - editable install works with `uv pip install -e .`
 - tests run with `uv run python -m unittest discover -s tests`
 

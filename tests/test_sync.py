@@ -1,11 +1,10 @@
 import io
-import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from grc.archive_state import load_archive_state
 from grc.http import FetchError, RemoteMissingError
-from grc.manifest import load_manifest
 from grc.models import EpisodeIndexEntry, FetchResult, RemoteMetadata
 from grc.sync import (
     discover_episode_entries,
@@ -143,14 +142,15 @@ class SyncTests(unittest.TestCase):
         entry = EpisodeIndexEntry(episode=1074, title="What Mythos Means")
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            transcript_dir = root / "transcripts"
-            transcript_dir.mkdir()
-            existing_file = transcript_dir / "sn-1074-what-mythos-means.md"
-            existing_file.write_text("ok", encoding="utf-8")
-            manifest = {"episodes": {"1074": {"status": "present"}}}
+            existing_file = root / "sn-1074-what-mythos-means.md"
+            existing_file.write_text(
+                "---\nepisode: 1074\ntitle: What Mythos Means\nsource_sha: abc\n---\n",
+                encoding="utf-8",
+            )
+            archive_state = load_archive_state(root)
             plan = plan_sync(
                 [entry],
-                manifest,
+                archive_state,
                 root,
                 force=False,
                 from_episode=None,
@@ -173,9 +173,11 @@ class SyncTests(unittest.TestCase):
             }
         )
         with TemporaryDirectory() as temp_dir:
-            exit_code, manifest = sync_archive(Path(temp_dir), client=client)
+            exit_code, archive_state = sync_archive(Path(temp_dir), client=client)
             self.assertEqual(exit_code, 2)
-            self.assertEqual(manifest["episodes"]["1074"]["status"], "remote_missing")
+            self.assertEqual(
+                archive_state["episodes"]["1074"]["status"], "remote_missing"
+            )
 
     def test_sync_archive_saves_completed_work_before_interrupt(self) -> None:
         next_txt_url = "https://www.grc.com/sn/sn-1075.txt"
@@ -195,8 +197,8 @@ class SyncTests(unittest.TestCase):
         with TemporaryDirectory() as temp_dir:
             with self.assertRaises(KeyboardInterrupt):
                 sync_archive(Path(temp_dir), client=client)
-            manifest = load_manifest(Path(temp_dir))
-        self.assertEqual(manifest["episodes"]["1074"]["status"], "present")
+            archive_state = load_archive_state(Path(temp_dir))
+        self.assertEqual(archive_state["episodes"]["1074"]["status"], "present")
 
     def test_force_sync_skips_download_when_metadata_sha_matches(self) -> None:
         transcript_text = (
@@ -228,27 +230,28 @@ class SyncTests(unittest.TestCase):
         )
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            first_exit_code, first_manifest = sync_archive(root, client=first_client)
+            first_exit_code, first_archive_state = sync_archive(
+                root, client=first_client
+            )
             self.assertEqual(first_exit_code, 0)
-            self.assertIn("source_sha", first_manifest["episodes"]["1074"])
+            self.assertIn("source_sha", first_archive_state["episodes"]["1074"])
 
-            second_exit_code, second_manifest = sync_archive(
+            second_exit_code, second_archive_state = sync_archive(
                 root, client=second_client, force=True
             )
 
             self.assertEqual(second_exit_code, 0)
-            self.assertEqual(second_manifest["episodes"]["1074"]["status"], "present")
+            self.assertEqual(
+                second_archive_state["episodes"]["1074"]["status"], "present"
+            )
             self.assertNotIn(TXT_URL, second_client.calls)
             self.assertEqual(second_client.metadata_calls, [TXT_URL])
 
-            transcript_path = root / "transcripts" / "sn-1074-what-mythos-means.md"
+            transcript_path = root / "sn-1074-what-mythos-means.md"
             transcript_payload = transcript_path.read_text(encoding="utf-8")
             self.assertIn("source_sha:", transcript_payload)
-
-            manifest_payload = json.loads(
-                (root / ".grc-sync" / "manifest.json").read_text(encoding="utf-8")
-            )
+            self.assertFalse((root / ".grc-sync").exists())
             self.assertEqual(
-                manifest_payload["episodes"]["1074"]["source_sha"],
-                first_manifest["episodes"]["1074"]["source_sha"],
+                second_archive_state["episodes"]["1074"]["source_sha"],
+                first_archive_state["episodes"]["1074"]["source_sha"],
             )

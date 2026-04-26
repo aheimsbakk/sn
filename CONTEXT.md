@@ -32,7 +32,9 @@ Phase 1 includes:
 - use `lxml` directly for HTML parsing
 - use `PyYAML` for front matter output
 - existing archived transcripts are only refreshed with `--force`
-- store a lightweight metadata-derived `source_sha` in both front matter and the manifest
+- store a lightweight metadata-derived `source_sha` in front matter
+- use the Markdown files themselves as the local source of truth with no separate manifest
+- store transcript files directly in the archive destination with no subdirectory
 - title slug length is capped at 32 characters and filenames always include the episode number
 - sync timeout, retry count, and backoff have defaults and are configurable
 
@@ -49,7 +51,7 @@ Phase 1 includes:
 - text transcript parsing with header alias support
 - HTML transcript fallback parsing
 - Markdown writer with YAML front matter
-- manifest storage in `.grc-sync/manifest.json`
+- archive state scanning from stored Markdown front matter
 - metadata-based checksum generation from HTTP headers and force-sync skip logic when the checksum matches
 - offline `unittest` coverage for core modules
 - real offline fixtures downloaded from GRC for episodes 1000 and 1074 plus the main archive page
@@ -59,7 +61,7 @@ Phase 1 includes:
 - no `__main__.py` module yet; the supported entry point is the `grc` console script
 - no yearly archive fixture yet; current real fixture coverage uses the main archive page plus two real episodes
 - `grc sync -v` now prints fetch progress to stderr for archive pages, transcript fetches, and stored files
-- sync now saves the manifest in a `finally` block so completed work remains visible after an interrupt
+- sync rebuilds local state by scanning stored Markdown files, so there is no separate persistent sync cache to drift
 - HTML parsing is intentionally conservative and may need refinement against real pages
 
 ## Metadata decision

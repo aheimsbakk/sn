@@ -8,8 +8,8 @@ The supported Python package name is `grc`.
 
 - Syncs transcript files from the GRC Security Now archive
 - Stores transcripts as UTF-8 Markdown with YAML front matter
-- Stores a lightweight metadata-derived `source_sha` in front matter and the manifest
-- Keeps local sync state so later runs can stay incremental
+- Stores a lightweight metadata-derived `source_sha` in front matter
+- Reads the stored Markdown files and their front matter as the local source of truth
 - Reports archive status, including missing or failed transcripts
 
 ## Quick start
@@ -33,7 +33,7 @@ uv run grc sync --latest 2
 uv run grc status
 ```
 
-The tool writes Markdown files to `./transcripts/` and sync state to `./.grc-sync/manifest.json`.
+The tool writes transcript Markdown files directly into the chosen archive directory.
 
 ## Usage
 
@@ -150,10 +150,7 @@ When you use the current directory as the archive root, the tool writes:
 
 ```text
 ./
-  transcripts/
-    sn-1000-one-thousand.md
-  .grc-sync/
-    manifest.json
+  sn-1000-one-thousand.md
 ```
 
 ## Run tests

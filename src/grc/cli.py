@@ -4,13 +4,13 @@ import argparse
 import sys
 from pathlib import Path
 
+from .archive_state import load_archive_state
 from .http import HttpClient
-from .manifest import load_manifest
 from .status import (
     list_non_present,
     render_status_json,
     render_status_text,
-    summarize_manifest,
+    summarize_archive_state,
 )
 from .sync import sync_archive
 from .version import __version__
@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
             max_retries=args.max_retries,
             backoff_seconds=args.backoff_seconds,
         )
-        exit_code, manifest = sync_archive(
+        exit_code, archive_state = sync_archive(
             archive_root,
             client=client,
             from_episode=args.from_episode,
@@ -71,13 +71,13 @@ def main(argv: list[str] | None = None) -> int:
             verbose=args.verbose,
             output=sys.stderr,
         )
-        summary = summarize_manifest(manifest)
+        summary = summarize_archive_state(archive_state)
         print(render_status_text(summary))
         return exit_code
 
-    manifest = load_manifest(archive_root)
-    summary = summarize_manifest(manifest)
-    missing = list_non_present(manifest) if args.missing else None
+    archive_state = load_archive_state(archive_root)
+    summary = summarize_archive_state(archive_state)
+    missing = list_non_present(archive_state) if args.missing else None
     if args.json:
         print(render_status_json(summary, missing))
     else:

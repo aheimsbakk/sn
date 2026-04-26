@@ -4,10 +4,10 @@ import hashlib
 from pathlib import Path
 from typing import Any, Protocol, TextIO, cast
 
+from .archive_state import load_archive_state
 from .archive_index import discover_yearly_archive_urls, parse_archive_entries
 from .html_parser import parse_html_transcript
 from .http import FetchError, HttpClient, RemoteMissingError
-from .manifest import load_manifest, save_manifest, update_episode_manifest
 from .markdown_writer import target_markdown_path, write_markdown
 from .models import (
     EpisodeIndexEntry,
@@ -31,7 +31,7 @@ class SupportsFetch(Protocol):
 
 def plan_sync(
     entries: list[EpisodeIndexEntry],
-    manifest: dict[str, Any],
+    archive_state: dict[str, Any],
     archive_root: Path,
     *,
     force: bool,
@@ -44,16 +44,16 @@ def plan_sync(
     ]
     if latest is not None:
         filtered = sorted(filtered, key=lambda item: item.episode)[-latest:]
-    manifest_episodes = manifest.get("episodes", {})
-    if not isinstance(manifest_episodes, dict):
-        manifest_episodes = {}
+    existing_episodes = archive_state.get("episodes", {})
+    if not isinstance(existing_episodes, dict):
+        existing_episodes = {}
     to_fetch: list[EpisodeIndexEntry] = []
     skipped_existing: list[int] = []
     for entry in filtered:
-        existing = manifest_episodes.get(str(entry.episode), {})
+        existing = existing_episodes.get(str(entry.episode), {})
         if not isinstance(existing, dict):
             existing = {}
-        local_path = target_markdown_path(archive_root, _placeholder_record(entry))
+        local_path = _existing_local_path(archive_root, entry, existing)
         if not force and existing.get("status") == "present" and local_path.exists():
             skipped_existing.append(entry.episode)
             continue
@@ -74,11 +74,11 @@ def sync_archive(
     verbose: int = 0,
     output: TextIO | None = None,
 ) -> tuple[int, dict[str, Any]]:
-    manifest = load_manifest(archive_root)
+    archive_state = load_archive_state(archive_root)
     entries = discover_episode_entries(client, verbose=verbose, output=output)
     plan = plan_sync(
         entries,
-        manifest,
+        archive_state,
         archive_root,
         force=force,
         from_episode=from_episode,
@@ -87,114 +87,64 @@ def sync_archive(
     )
     partial = False
 
-    try:
-        for entry in plan.to_fetch:
-            manifest_episodes = manifest.get("episodes", {})
-            existing = manifest_episodes.get(str(entry.episode), {})
-            if not isinstance(existing, dict):
-                existing = {}
-            if dry_run:
-                _emit(
-                    output,
-                    verbose,
-                    f"plan transcript {entry.episode}: {_choose_url(entry, source_preference) or 'no transcript url'}",
-                )
-                update_episode_manifest(
-                    manifest,
-                    episode=entry.episode,
-                    title_slug=slugify(entry.title),
-                    transcript_url=_choose_url(entry, source_preference),
-                    source_format=None,
-                    original_encoding=None,
-                    local_path=None,
-                    source_sha=None,
-                    status="fetch_error",
-                    error="dry-run",
-                )
-                continue
-            if force and _skip_download_for_unchanged_metadata(
+    for entry in plan.to_fetch:
+        existing_episodes = archive_state.get("episodes", {})
+        existing = existing_episodes.get(str(entry.episode), {})
+        if not isinstance(existing, dict):
+            existing = {}
+        if dry_run:
+            _emit(
+                output,
+                verbose,
+                f"plan transcript {entry.episode}: {_choose_url(entry, source_preference) or 'no transcript url'}",
+            )
+            continue
+        if force and _skip_download_for_unchanged_metadata(
+            client,
+            archive_root,
+            entry,
+            existing,
+            source_preference,
+            verbose=verbose,
+            output=output,
+        ):
+            continue
+        try:
+            record, _ = fetch_and_parse_entry(
                 client,
-                archive_root,
                 entry,
-                existing,
                 source_preference,
                 verbose=verbose,
                 output=output,
-            ):
-                continue
-            try:
-                record, source_sha = fetch_and_parse_entry(
-                    client,
-                    entry,
-                    source_preference,
-                    verbose=verbose,
-                    output=output,
-                )
-                output_path = write_markdown(archive_root, record)
-                update_episode_manifest(
-                    manifest,
-                    episode=record.episode,
-                    title_slug=slugify(record.title),
-                    transcript_url=record.transcript_url,
-                    source_format=record.source_format,
-                    original_encoding=record.original_encoding,
-                    local_path=str(output_path.relative_to(archive_root)),
-                    source_sha=source_sha,
-                    status="present",
-                )
-                _emit(
-                    output,
-                    verbose,
-                    f"stored transcript {record.episode}: {output_path.relative_to(archive_root)}",
-                )
-            except RemoteMissingError as error:
-                partial = True
-                update_episode_manifest(
-                    manifest,
-                    episode=entry.episode,
-                    title_slug=slugify(entry.title),
-                    transcript_url=_choose_url(entry, source_preference),
-                    source_format=None,
-                    original_encoding=None,
-                    local_path=None,
-                    source_sha=None,
-                    status="remote_missing",
-                    error=str(error),
-                )
-                _emit(output, verbose, f"missing transcript {entry.episode}: {error}")
-            except FetchError as error:
-                partial = True
-                update_episode_manifest(
-                    manifest,
-                    episode=entry.episode,
-                    title_slug=slugify(entry.title),
-                    transcript_url=_choose_url(entry, source_preference),
-                    source_format=None,
-                    original_encoding=None,
-                    local_path=None,
-                    source_sha=None,
-                    status="fetch_error",
-                    error=str(error),
-                )
-                _emit(output, verbose, f"fetch error {entry.episode}: {error}")
-            except ValueError as error:
-                partial = True
-                update_episode_manifest(
-                    manifest,
-                    episode=entry.episode,
-                    title_slug=slugify(entry.title),
-                    transcript_url=_choose_url(entry, source_preference),
-                    source_format=None,
-                    original_encoding=None,
-                    local_path=None,
-                    source_sha=None,
-                    status="parse_error",
-                    error=str(error),
-                )
-                _emit(output, verbose, f"parse error {entry.episode}: {error}")
-    finally:
-        save_manifest(archive_root, manifest)
-    return (2 if partial else 0), manifest
+            )
+            output_path = write_markdown(archive_root, record)
+            archive_state["episodes"][str(record.episode)] = _present_episode_state(
+                record, output_path, archive_root
+            )
+            _emit(
+                output,
+                verbose,
+                f"stored transcript {record.episode}: {output_path.relative_to(archive_root)}",
+            )
+        except RemoteMissingError as error:
+            partial = True
+            archive_state["episodes"][str(entry.episode)] = _error_episode_state(
+                entry, source_preference, "remote_missing", str(error)
+            )
+            _emit(output, verbose, f"missing transcript {entry.episode}: {error}")
+        except FetchError as error:
+            partial = True
+            archive_state["episodes"][str(entry.episode)] = _error_episode_state(
+                entry, source_preference, "fetch_error", str(error)
+            )
+            _emit(output, verbose, f"fetch error {entry.episode}: {error}")
+        except ValueError as error:
+            partial = True
+            archive_state["episodes"][str(entry.episode)] = _error_episode_state(
+                entry, source_preference, "parse_error", str(error)
+            )
+            _emit(output, verbose, f"parse error {entry.episode}: {error}")
+    return (2 if partial else 0), archive_state
 
 
 def discover_episode_entries(
@@ -426,3 +376,37 @@ def _existing_local_path(
     if isinstance(stored_local_path, str) and stored_local_path:
         return archive_root / stored_local_path
     return target_markdown_path(archive_root, _placeholder_record(entry))
+
+
+def _present_episode_state(
+    record: TranscriptRecord, output_path: Path, archive_root: Path
+) -> dict[str, Any]:
+    return {
+        "episode": record.episode,
+        "title_slug": slugify(record.title),
+        "transcript_url": record.transcript_url,
+        "source_format": record.source_format,
+        "original_encoding": record.original_encoding,
+        "local_path": str(output_path.relative_to(archive_root)),
+        "source_sha": record.source_sha,
+        "status": "present",
+    }
+
+
+def _error_episode_state(
+    entry: EpisodeIndexEntry,
+    source_preference: str,
+    status: str,
+    error: str,
+) -> dict[str, Any]:
+    return {
+        "episode": entry.episode,
+        "title_slug": slugify(entry.title),
+        "transcript_url": _choose_url(entry, source_preference),
+        "source_format": None,
+        "original_encoding": None,
+        "local_path": None,
+        "source_sha": None,
+        "status": status,
+        "last_error_summary": error,
+    }
