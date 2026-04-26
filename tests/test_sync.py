@@ -1,11 +1,12 @@
 import io
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from grc.http import FetchError, RemoteMissingError
 from grc.manifest import load_manifest
-from grc.models import EpisodeIndexEntry, FetchResult
+from grc.models import EpisodeIndexEntry, FetchResult, RemoteMetadata
 from grc.sync import (
     discover_episode_entries,
     fetch_and_parse_entry,
@@ -21,9 +22,11 @@ HTML_URL = "https://www.grc.com/sn/sn-1074.htm"
 
 
 class FakeClient:
-    def __init__(self, responses):
+    def __init__(self, responses, metadata_responses=None):
         self.responses = responses
+        self.metadata_responses = metadata_responses or {}
         self.calls = []
+        self.metadata_calls = []
 
     def fetch(self, url: str):
         self.calls.append(url)
@@ -32,14 +35,48 @@ class FakeClient:
             raise response
         return response
 
+    def fetch_metadata(self, url: str):
+        self.metadata_calls.append(url)
+        response = self.metadata_responses[url]
+        if isinstance(response, BaseException):
+            raise response
+        return response
 
-def _result(url: str, text: str) -> FetchResult:
+
+def _result(
+    url: str,
+    text: str,
+    *,
+    etag: str | None = '"etag-1"',
+    last_modified: str | None = "Sat, 26 Apr 2026 12:00:00 GMT",
+) -> FetchResult:
     return FetchResult(
         url=url,
         status_code=200,
         data=text.encode("utf-8"),
         content_type="text/html",
         charset="utf-8",
+        etag=etag,
+        last_modified=last_modified,
+        content_length=len(text.encode("utf-8")),
+    )
+
+
+def _metadata(
+    url: str,
+    *,
+    etag: str | None = '"etag-1"',
+    last_modified: str | None = "Sat, 26 Apr 2026 12:00:00 GMT",
+    content_length: int = 83,
+) -> RemoteMetadata:
+    return RemoteMetadata(
+        url=url,
+        status_code=200,
+        content_type="text/plain",
+        charset="utf-8",
+        etag=etag,
+        last_modified=last_modified,
+        content_length=content_length,
     )
 
 
@@ -160,3 +197,58 @@ class SyncTests(unittest.TestCase):
                 sync_archive(Path(temp_dir), client=client)
             manifest = load_manifest(Path(temp_dir))
         self.assertEqual(manifest["episodes"]["1074"]["status"], "present")
+
+    def test_force_sync_skips_download_when_metadata_sha_matches(self) -> None:
+        transcript_text = (
+            "SERIES: Security Now!\n"
+            "EPISODE: 1074\n"
+            "TITLE: What Mythos Means\n\n"
+            "Leo Laporte: Hello"
+        )
+        first_client = FakeClient(
+            {
+                MAIN_URL: _result(
+                    MAIN_URL, '<a href="sn/sn-1074.txt">SN 1074 transcript</a>'
+                ),
+                TXT_URL: _result(TXT_URL, transcript_text),
+            }
+        )
+        second_client = FakeClient(
+            {
+                MAIN_URL: _result(
+                    MAIN_URL, '<a href="sn/sn-1074.txt">SN 1074 transcript</a>'
+                ),
+                TXT_URL: AssertionError("full transcript download should be skipped"),
+            },
+            metadata_responses={
+                TXT_URL: _metadata(
+                    TXT_URL, content_length=len(transcript_text.encode("utf-8"))
+                )
+            },
+        )
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            first_exit_code, first_manifest = sync_archive(root, client=first_client)
+            self.assertEqual(first_exit_code, 0)
+            self.assertIn("source_sha", first_manifest["episodes"]["1074"])
+
+            second_exit_code, second_manifest = sync_archive(
+                root, client=second_client, force=True
+            )
+
+            self.assertEqual(second_exit_code, 0)
+            self.assertEqual(second_manifest["episodes"]["1074"]["status"], "present")
+            self.assertNotIn(TXT_URL, second_client.calls)
+            self.assertEqual(second_client.metadata_calls, [TXT_URL])
+
+            transcript_path = root / "transcripts" / "sn-1074-what-mythos-means.md"
+            transcript_payload = transcript_path.read_text(encoding="utf-8")
+            self.assertIn("source_sha:", transcript_payload)
+
+            manifest_payload = json.loads(
+                (root / ".grc-sync" / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                manifest_payload["episodes"]["1074"]["source_sha"],
+                first_manifest["episodes"]["1074"]["source_sha"],
+            )

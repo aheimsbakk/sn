@@ -19,12 +19,14 @@ class MarkdownWriterTests(unittest.TestCase):
             transcript_url="https://example.com/sn-0007.txt",
             source_format="txt",
             original_encoding="utf-8",
+            source_sha="abc123",
             license="Copyright text.",
             show_tease="A teaser.",
             transcript_lines=["**Steve Gibson:** Hello"],
         )
         output = build_markdown(record)
         self.assertIn("episode: 7", output)
+        self.assertIn("source_sha: abc123", output)
         self.assertIn("## Transcript", output)
         self.assertIn("**Steve Gibson:** Hello", output)
 

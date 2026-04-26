@@ -32,7 +32,7 @@ def update_episode_manifest(
     source_format: str | None,
     original_encoding: str | None,
     local_path: str | None,
-    source_hash: str | None,
+    source_sha: str | None,
     status: str,
     error: str | None = None,
 ) -> None:
@@ -51,7 +51,7 @@ def update_episode_manifest(
         "original_encoding": original_encoding,
         "local_path": local_path,
         "fetched_at": now,
-        "source_hash": source_hash,
+        "source_sha": source_sha,
         "status": status,
         "last_retry_at": now if status != "present" else None,
         "last_error_summary": error,

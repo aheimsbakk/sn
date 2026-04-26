@@ -106,6 +106,7 @@ The front matter should help later search, but stay compact.
 - `transcript_url`
 - `source_format`
 - `original_encoding`
+- `source_sha`
 - `license`
 
 ### Keep in the Markdown body, not front matter
@@ -139,6 +140,7 @@ audio_url: https://media.grc.com/sn/sn-1074.mp3
 transcript_url: https://www.grc.com/sn/sn-1074.txt
 source_format: txt
 original_encoding: windows-1252
+source_sha: 7a673f5d5cbf6f5a3b5ef7a1b8ea4ce9c11f8f8d6fe0f9f3d4d3ca83f0f8f95a
 license: Copyright and license text preserved from the source transcript when present.
 ---
 ```
@@ -210,6 +212,8 @@ Rules:
 10. Retry missing transcripts on later runs
 
 By default, `grc sync` should not re-fetch already archived transcripts to detect upstream edits. Rewriting changed remote transcripts is a `--force` behavior.
+
+When `--force` is used, the tool should first compare a lightweight metadata-based checksum derived from response headers such as `ETag`, `Last-Modified`, and `Content-Length`. If that checksum matches the stored value, the tool should skip the full transcript download and keep the existing local file.
 
 ---
 
@@ -403,12 +407,12 @@ It should track:
 - original encoding
 - local file path
 - fetched timestamp
-- source content hash
+- source metadata checksum (`source_sha`)
 - sync status (`present`, `remote_missing`, `fetch_error`, `parse_error`)
 - last retry timestamp
 - last error summary
 
-This avoids stuffing sync-only data into Markdown front matter.
+The same `source_sha` should also be written into Markdown front matter so stored files retain their own lightweight remote change marker.
 
 ---
 
@@ -487,7 +491,7 @@ Prefer standard library functionality by default, but use `lxml` and `PyYAML` wh
 
 - build backend: `setuptools`
 - package name: `grc`
-- current version: `0.3.0`
+- current version: `0.4.0`
 - editable install works with `uv pip install -e .`
 - tests run with `uv run python -m unittest discover -s tests`
 

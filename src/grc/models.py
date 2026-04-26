@@ -29,6 +29,7 @@ class TranscriptRecord:
     transcript_url: str | None = None
     source_format: str | None = None
     original_encoding: str | None = None
+    source_sha: str | None = None
     license: str | None = None
     show_tease: str | None = None
     transcript_lines: list[str] = field(default_factory=list)
@@ -41,6 +42,20 @@ class FetchResult:
     data: bytes
     content_type: str | None = None
     charset: str | None = None
+    etag: str | None = None
+    last_modified: str | None = None
+    content_length: int | None = None
+
+
+@dataclass(slots=True)
+class RemoteMetadata:
+    url: str
+    status_code: int
+    content_type: str | None = None
+    charset: str | None = None
+    etag: str | None = None
+    last_modified: str | None = None
+    content_length: int | None = None
 
 
 @dataclass(slots=True)

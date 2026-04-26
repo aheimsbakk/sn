@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from .models import FetchResult
+from .models import FetchResult, RemoteMetadata
 
 
-USER_AGENT = "grc/0.3.0 (+https://www.grc.com/)"
+USER_AGENT = "grc/0.4.0 (+https://www.grc.com/)"
 
 
 @dataclass(slots=True)
@@ -21,24 +22,54 @@ class HttpClient:
     _last_request_at: float | None = None
 
     def fetch(self, url: str) -> FetchResult:
+        return self._request_fetch_result(url, method="GET")
+
+    def fetch_metadata(self, url: str) -> RemoteMetadata:
+        return self._request_remote_metadata(url, method="HEAD")
+
+    def _request_fetch_result(self, url: str, *, method: str) -> FetchResult:
+        response_data = self._request(url, method=method)
+        return FetchResult(**response_data)
+
+    def _request_remote_metadata(self, url: str, *, method: str) -> RemoteMetadata:
+        response_data = self._request(url, method=method)
+        response_data.pop("data", None)
+        return RemoteMetadata(**response_data)
+
+    def _request(self, url: str, *, method: str) -> dict[str, Any]:
         attempts = self.max_retries + 1
         last_error: Exception | None = None
         for attempt in range(attempts):
             self._sleep_if_needed()
             try:
-                request = Request(url, headers={"User-Agent": USER_AGENT})
+                request = Request(
+                    url, headers={"User-Agent": USER_AGENT}, method=method
+                )
                 with urlopen(request, timeout=self.timeout_seconds) as response:
-                    payload = response.read()
                     content_type = response.headers.get_content_type()
                     charset = response.headers.get_content_charset()
-                    self._last_request_at = time.monotonic()
-                    return FetchResult(
-                        url=url,
-                        status_code=getattr(response, "status", 200),
-                        data=payload,
-                        content_type=content_type,
-                        charset=charset,
+                    etag = response.headers.get("ETag")
+                    last_modified = response.headers.get("Last-Modified")
+                    content_length_header = response.headers.get("Content-Length")
+                    content_length = (
+                        int(content_length_header)
+                        if content_length_header and content_length_header.isdigit()
+                        else None
                     )
+                    self._last_request_at = time.monotonic()
+                    payload = b""
+                    if method != "HEAD":
+                        payload = response.read()
+                    return {
+                        "url": url,
+                        "status_code": getattr(response, "status", 200),
+                        "data": payload,
+                        "content_type": content_type,
+                        "charset": charset,
+                        "etag": etag,
+                        "last_modified": last_modified,
+                        "content_length": content_length,
+                    }
             except HTTPError as error:
                 self._last_request_at = time.monotonic()
                 if error.code == 404:

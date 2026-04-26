@@ -8,6 +8,7 @@ The supported Python package name is `grc`.
 
 - Syncs transcript files from the GRC Security Now archive
 - Stores transcripts as UTF-8 Markdown with YAML front matter
+- Stores a lightweight metadata-derived `source_sha` in front matter and the manifest
 - Keeps local sync state so later runs can stay incremental
 - Reports archive status, including missing or failed transcripts
 
@@ -68,11 +69,13 @@ See what would happen without writing files:
 uv run grc sync --latest 2 --dry-run
 ```
 
-Re-download episodes even if they already exist locally:
+Re-check episodes even if they already exist locally:
 
 ```bash
 uv run grc sync --latest 2 --force
 ```
+
+With `--force`, the tool first compares a lightweight checksum built from remote metadata headers. If the checksum matches the stored `source_sha`, it skips the full transcript download.
 
 Prefer HTML transcripts instead of text transcripts:
 
@@ -114,7 +117,7 @@ uv run grc status --json
 - `--from-episode N`: lower episode bound
 - `--to-episode N`: upper episode bound
 - `--latest N`: sync only the most recent `N` episodes
-- `--force`: rewrite episodes even if they already exist
+- `--force`: re-check existing episodes and rewrite only when the remote metadata checksum changes
 - `--dry-run`: plan work without writing output files
 - `--pause-seconds FLOAT`: delay between HTTP requests, default `2.0`
 - `--timeout-seconds FLOAT`: request timeout, default `20.0`

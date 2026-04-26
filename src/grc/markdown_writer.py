@@ -21,6 +21,7 @@ def build_markdown(record: TranscriptRecord) -> str:
     metadata["transcript_url"] = record.transcript_url
     metadata["source_format"] = record.source_format
     metadata["original_encoding"] = record.original_encoding
+    metadata["source_sha"] = record.source_sha
     metadata["license"] = record.license
 
     front_matter = yaml.safe_dump(

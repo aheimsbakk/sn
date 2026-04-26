@@ -9,7 +9,13 @@ from .html_parser import parse_html_transcript
 from .http import FetchError, HttpClient, RemoteMissingError
 from .manifest import load_manifest, save_manifest, update_episode_manifest
 from .markdown_writer import target_markdown_path, write_markdown
-from .models import EpisodeIndexEntry, FetchResult, SyncPlan, TranscriptRecord
+from .models import (
+    EpisodeIndexEntry,
+    FetchResult,
+    RemoteMetadata,
+    SyncPlan,
+    TranscriptRecord,
+)
 from .normalize import detect_and_decode, slugify
 from .text_parser import parse_text_transcript
 
@@ -19,6 +25,8 @@ MAIN_ARCHIVE_URL = "https://www.grc.com/securitynow.htm"
 
 class SupportsFetch(Protocol):
     def fetch(self, url: str) -> FetchResult: ...
+
+    def fetch_metadata(self, url: str) -> RemoteMetadata: ...
 
 
 def plan_sync(
@@ -81,6 +89,10 @@ def sync_archive(
 
     try:
         for entry in plan.to_fetch:
+            manifest_episodes = manifest.get("episodes", {})
+            existing = manifest_episodes.get(str(entry.episode), {})
+            if not isinstance(existing, dict):
+                existing = {}
             if dry_run:
                 _emit(
                     output,
@@ -95,13 +107,23 @@ def sync_archive(
                     source_format=None,
                     original_encoding=None,
                     local_path=None,
-                    source_hash=None,
+                    source_sha=None,
                     status="fetch_error",
                     error="dry-run",
                 )
                 continue
+            if force and _skip_download_for_unchanged_metadata(
+                client,
+                archive_root,
+                entry,
+                existing,
+                source_preference,
+                verbose=verbose,
+                output=output,
+            ):
+                continue
             try:
-                record, source_hash = fetch_and_parse_entry(
+                record, source_sha = fetch_and_parse_entry(
                     client,
                     entry,
                     source_preference,
@@ -117,7 +139,7 @@ def sync_archive(
                     source_format=record.source_format,
                     original_encoding=record.original_encoding,
                     local_path=str(output_path.relative_to(archive_root)),
-                    source_hash=source_hash,
+                    source_sha=source_sha,
                     status="present",
                 )
                 _emit(
@@ -135,7 +157,7 @@ def sync_archive(
                     source_format=None,
                     original_encoding=None,
                     local_path=None,
-                    source_hash=None,
+                    source_sha=None,
                     status="remote_missing",
                     error=str(error),
                 )
@@ -150,7 +172,7 @@ def sync_archive(
                     source_format=None,
                     original_encoding=None,
                     local_path=None,
-                    source_hash=None,
+                    source_sha=None,
                     status="fetch_error",
                     error=str(error),
                 )
@@ -165,7 +187,7 @@ def sync_archive(
                     source_format=None,
                     original_encoding=None,
                     local_path=None,
-                    source_hash=None,
+                    source_sha=None,
                     status="parse_error",
                     error=str(error),
                 )
@@ -214,7 +236,7 @@ def fetch_and_parse_entry(
     *,
     verbose: int = 0,
     output: TextIO | None = None,
-) -> tuple[TranscriptRecord, str]:
+) -> tuple[TranscriptRecord, str | None]:
     urls = _candidate_urls(entry, source_preference)
     last_error: Exception | None = None
     for source_format, url in urls:
@@ -222,7 +244,11 @@ def fetch_and_parse_entry(
             _emit(output, verbose, f"fetch transcript {source_format}: {url}")
             result = client.fetch(url)
             text, encoding = detect_and_decode(result.data, result.charset)
-            source_hash = hashlib.sha256(result.data).hexdigest()
+            source_sha = build_source_sha(
+                etag=result.etag,
+                last_modified=result.last_modified,
+                content_length=result.content_length,
+            )
             if source_format == "txt":
                 record = parse_text_transcript(
                     text, transcript_url=url, original_encoding=encoding
@@ -237,7 +263,8 @@ def fetch_and_parse_entry(
                 record.title = entry.title
             if not record.description:
                 record.description = entry.description
-            return cast(TranscriptRecord, record), source_hash
+            record.source_sha = source_sha
+            return cast(TranscriptRecord, record), source_sha
         except RemoteMissingError as error:
             last_error = error
             continue
@@ -297,3 +324,105 @@ def _emit(output: TextIO | None, verbose: int, message: str) -> None:
     if verbose <= 0 or output is None:
         return
     output.write(f"{message}\n")
+
+
+def build_source_sha(
+    *,
+    etag: str | None,
+    last_modified: str | None,
+    content_length: int | None,
+) -> str | None:
+    parts: list[str] = []
+    if etag:
+        parts.append(f"etag:{etag.strip()}")
+    if last_modified:
+        parts.append(f"last-modified:{last_modified.strip()}")
+    if content_length is not None:
+        parts.append(f"content-length:{content_length}")
+    if not parts:
+        return None
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def _skip_download_for_unchanged_metadata(
+    client: SupportsFetch,
+    archive_root: Path,
+    entry: EpisodeIndexEntry,
+    existing: dict[str, Any],
+    source_preference: str,
+    *,
+    verbose: int,
+    output: TextIO | None,
+) -> bool:
+    if existing.get("status") != "present":
+        return False
+    local_path = _existing_local_path(archive_root, entry, existing)
+    if not local_path.exists():
+        return False
+    existing_sha = existing.get("source_sha") or existing.get("source_hash")
+    if not isinstance(existing_sha, str) or not existing_sha:
+        return False
+    remote_sha = _fetch_remote_source_sha(
+        client, entry, source_preference, verbose=verbose, output=output
+    )
+    if remote_sha is None or remote_sha != existing_sha:
+        return False
+    existing["source_sha"] = existing_sha
+    _emit(
+        output, verbose, f"unchanged transcript {entry.episode}: metadata sha matched"
+    )
+    return True
+
+
+def _fetch_remote_source_sha(
+    client: SupportsFetch,
+    entry: EpisodeIndexEntry,
+    source_preference: str,
+    *,
+    verbose: int,
+    output: TextIO | None,
+) -> str | None:
+    urls = _candidate_urls(entry, source_preference)
+    last_error: Exception | None = None
+    for source_format, url in urls:
+        try:
+            _emit(output, verbose, f"fetch transcript metadata {source_format}: {url}")
+            metadata = client.fetch_metadata(url)
+            source_sha = build_source_sha(
+                etag=metadata.etag,
+                last_modified=metadata.last_modified,
+                content_length=metadata.content_length,
+            )
+            if source_sha:
+                return source_sha
+            last_error = ValueError(f"missing metadata checksum fields for {url}")
+            if (
+                source_preference == "auto"
+                and source_format == "txt"
+                and entry.transcript_html_url
+            ):
+                continue
+            return None
+        except RemoteMissingError as error:
+            last_error = error
+            if (
+                source_preference == "auto"
+                and source_format == "txt"
+                and entry.transcript_html_url
+            ):
+                continue
+            return None
+        except FetchError:
+            return None
+    if isinstance(last_error, RemoteMissingError):
+        return None
+    return None
+
+
+def _existing_local_path(
+    archive_root: Path, entry: EpisodeIndexEntry, existing: dict[str, Any]
+) -> Path:
+    stored_local_path = existing.get("local_path")
+    if isinstance(stored_local_path, str) and stored_local_path:
+        return archive_root / stored_local_path
+    return target_markdown_path(archive_root, _placeholder_record(entry))

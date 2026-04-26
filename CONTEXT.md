@@ -32,6 +32,7 @@ Phase 1 includes:
 - use `lxml` directly for HTML parsing
 - use `PyYAML` for front matter output
 - existing archived transcripts are only refreshed with `--force`
+- store a lightweight metadata-derived `source_sha` in both front matter and the manifest
 - title slug length is capped at 32 characters and filenames always include the episode number
 - sync timeout, retry count, and backoff have defaults and are configurable
 
@@ -49,6 +50,7 @@ Phase 1 includes:
 - HTML transcript fallback parsing
 - Markdown writer with YAML front matter
 - manifest storage in `.grc-sync/manifest.json`
+- metadata-based checksum generation from HTTP headers and force-sync skip logic when the checksum matches
 - offline `unittest` coverage for core modules
 - real offline fixtures downloaded from GRC for episodes 1000 and 1074 plus the main archive page
 
@@ -77,6 +79,7 @@ Key normalized fields:
 - `source_format`
 - `original_encoding`
 - `license`
+- `source_sha`
 
 ## Sync status behavior
 

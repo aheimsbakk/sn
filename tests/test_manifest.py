@@ -18,9 +18,10 @@ class ManifestTests(unittest.TestCase):
                 source_format="txt",
                 original_encoding="utf-8",
                 local_path="transcripts/sn-0009-episode-nine.md",
-                source_hash="abc",
+                source_sha="abc",
                 status="present",
             )
             save_manifest(root, manifest)
             reloaded = load_manifest(root)
             self.assertEqual(reloaded["episodes"]["9"]["status"], "present")
+            self.assertEqual(reloaded["episodes"]["9"]["source_sha"], "abc")
