@@ -469,7 +469,7 @@ Prefer standard library functionality by default, but use `lxml` and `PyYAML` wh
 
 - build backend: `setuptools`
 - package name: `sn`
-- current version: `1.2.0`
+- current version: `2.0.0`
 - editable install works with `uv pip install -e .`
 - tests run with `uv run python -m unittest discover -s tests`
 
