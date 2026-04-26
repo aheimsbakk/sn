@@ -469,7 +469,7 @@ Prefer standard library functionality by default, but use `lxml` and `PyYAML` wh
 
 - build backend: `setuptools`
 - package name: `grc`
-- current version: `1.0.0`
+- current version: `1.0.1`
 - editable install works with `uv pip install -e .`
 - tests run with `uv run python -m unittest discover -s tests`
 
