@@ -226,6 +226,7 @@ grc [global options] <command> [command options]
 - `-h`, `--help`
 - `-V`, `--version`
 - `-v`, `--verbose` (repeatable)
+  - print fetch progress to stderr during sync so the user can see live work
 - `-d`, `--archive-dest PATH`
   - archive root directory
   - default: current working directory
@@ -460,7 +461,7 @@ tests/
 Notes:
 
 - `__main__.py` is not required in v1 because the console entry point is `grc`
-- dedicated logging helpers are deferred until real sync logging needs appear
+- `sync.py` now emits simple verbose progress lines directly during archive and transcript fetches
 
 ---
 
@@ -486,7 +487,7 @@ Prefer standard library functionality by default, but use `lxml` and `PyYAML` wh
 
 - build backend: `setuptools`
 - package name: `grc`
-- current version: `0.2.0`
+- current version: `0.3.0`
 - editable install works with `uv pip install -e .`
 - tests run with `uv run python -m unittest discover -s tests`
 

@@ -1,6 +1,7 @@
 import io
 import importlib.util
 import json
+import sys
 import tomllib
 import unittest
 from contextlib import redirect_stdout
@@ -68,3 +69,5 @@ class CliTests(unittest.TestCase):
             exit_code = cli.main(["-d", temp_dir, "sync", "--dry-run"])
         self.assertEqual(exit_code, 0)
         mocked.assert_called_once()
+        self.assertEqual(mocked.call_args.kwargs["verbose"], 0)
+        self.assertIs(mocked.call_args.kwargs["output"], sys.stderr)

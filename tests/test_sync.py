@@ -1,8 +1,10 @@
+import io
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from grc.http import FetchError, RemoteMissingError
+from grc.manifest import load_manifest
 from grc.models import EpisodeIndexEntry, FetchResult
 from grc.sync import (
     discover_episode_entries,
@@ -26,7 +28,7 @@ class FakeClient:
     def fetch(self, url: str):
         self.calls.append(url)
         response = self.responses[url]
-        if isinstance(response, Exception):
+        if isinstance(response, BaseException):
             raise response
         return response
 
@@ -42,6 +44,27 @@ def _result(url: str, text: str) -> FetchResult:
 
 
 class SyncTests(unittest.TestCase):
+    def test_sync_archive_emits_verbose_fetch_progress(self) -> None:
+        client = FakeClient(
+            {
+                MAIN_URL: _result(
+                    MAIN_URL, '<a href="sn/sn-1074.txt">SN 1074 transcript</a>'
+                ),
+                TXT_URL: _result(
+                    TXT_URL,
+                    "SERIES: Security Now!\nEPISODE: 1074\nTITLE: What Mythos Means\n\nLeo Laporte: Hello",
+                ),
+            }
+        )
+        with TemporaryDirectory() as temp_dir:
+            buffer = io.StringIO()
+            exit_code, _ = sync_archive(
+                Path(temp_dir), client=client, verbose=1, output=buffer
+            )
+        self.assertEqual(exit_code, 0)
+        self.assertIn(f"fetch archive index: {MAIN_URL}", buffer.getvalue())
+        self.assertIn(f"fetch transcript txt: {TXT_URL}", buffer.getvalue())
+
     def test_discover_episode_entries_combines_pages(self) -> None:
         client = FakeClient(
             {
@@ -116,3 +139,24 @@ class SyncTests(unittest.TestCase):
             exit_code, manifest = sync_archive(Path(temp_dir), client=client)
             self.assertEqual(exit_code, 2)
             self.assertEqual(manifest["episodes"]["1074"]["status"], "remote_missing")
+
+    def test_sync_archive_saves_completed_work_before_interrupt(self) -> None:
+        next_txt_url = "https://www.grc.com/sn/sn-1075.txt"
+        client = FakeClient(
+            {
+                MAIN_URL: _result(
+                    MAIN_URL,
+                    '<a href="sn/sn-1074.txt">SN 1074 transcript</a><a href="sn/sn-1075.txt">SN 1075 transcript</a>',
+                ),
+                TXT_URL: _result(
+                    TXT_URL,
+                    "SERIES: Security Now!\nEPISODE: 1074\nTITLE: What Mythos Means\n\nLeo Laporte: Hello",
+                ),
+                next_txt_url: KeyboardInterrupt(),
+            }
+        )
+        with TemporaryDirectory() as temp_dir:
+            with self.assertRaises(KeyboardInterrupt):
+                sync_archive(Path(temp_dir), client=client)
+            manifest = load_manifest(Path(temp_dir))
+        self.assertEqual(manifest["episodes"]["1074"]["status"], "present")

@@ -68,6 +68,8 @@ def main(argv: list[str] | None = None) -> int:
             force=args.force,
             dry_run=args.dry_run,
             source_preference=args.source_preference,
+            verbose=args.verbose,
+            output=sys.stderr,
         )
         summary = summarize_manifest(manifest)
         print(render_status_text(summary))

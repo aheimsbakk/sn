@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 from .models import FetchResult
 
 
-USER_AGENT = "grc/0.2.0 (+https://www.grc.com/)"
+USER_AGENT = "grc/0.3.0 (+https://www.grc.com/)"
 
 
 @dataclass(slots=True)

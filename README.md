@@ -106,7 +106,7 @@ uv run grc status --json
 
 - `-h`, `--help`: show help
 - `-V`, `--version`: show version
-- `-v`, `--verbose`: accepted by the CLI for future verbose output
+- `-v`, `--verbose`: show fetch progress on stderr; repeat for more detail later
 - `-d`, `--archive-dest PATH`: choose the archive root directory
 
 ### `sync` options

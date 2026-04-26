@@ -56,7 +56,8 @@ Phase 1 includes:
 
 - no `__main__.py` module yet; the supported entry point is the `grc` console script
 - no yearly archive fixture yet; current real fixture coverage uses the main archive page plus two real episodes
-- sync output is minimal and does not yet expose verbose logging detail
+- `grc sync -v` now prints fetch progress to stderr for archive pages, transcript fetches, and stored files
+- sync now saves the manifest in a `finally` block so completed work remains visible after an interrupt
 - HTML parsing is intentionally conservative and may need refinement against real pages
 
 ## Metadata decision

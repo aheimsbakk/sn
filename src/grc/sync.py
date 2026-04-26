@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Protocol, TextIO, cast
 
 from .archive_index import discover_yearly_archive_urls, parse_archive_entries
 from .html_parser import parse_html_transcript
@@ -63,9 +63,11 @@ def sync_archive(
     force: bool = False,
     dry_run: bool = False,
     source_preference: str = "auto",
+    verbose: int = 0,
+    output: TextIO | None = None,
 ) -> tuple[int, dict[str, Any]]:
     manifest = load_manifest(archive_root)
-    entries = discover_episode_entries(client)
+    entries = discover_episode_entries(client, verbose=verbose, output=output)
     plan = plan_sync(
         entries,
         manifest,
@@ -77,85 +79,106 @@ def sync_archive(
     )
     partial = False
 
-    for entry in plan.to_fetch:
-        if dry_run:
-            update_episode_manifest(
-                manifest,
-                episode=entry.episode,
-                title_slug=slugify(entry.title),
-                transcript_url=_choose_url(entry, source_preference),
-                source_format=None,
-                original_encoding=None,
-                local_path=None,
-                source_hash=None,
-                status="fetch_error",
-                error="dry-run",
-            )
-            continue
-        try:
-            record, source_hash = fetch_and_parse_entry(
-                client, entry, source_preference
-            )
-            output_path = write_markdown(archive_root, record)
-            update_episode_manifest(
-                manifest,
-                episode=record.episode,
-                title_slug=slugify(record.title),
-                transcript_url=record.transcript_url,
-                source_format=record.source_format,
-                original_encoding=record.original_encoding,
-                local_path=str(output_path.relative_to(archive_root)),
-                source_hash=source_hash,
-                status="present",
-            )
-        except RemoteMissingError as error:
-            partial = True
-            update_episode_manifest(
-                manifest,
-                episode=entry.episode,
-                title_slug=slugify(entry.title),
-                transcript_url=_choose_url(entry, source_preference),
-                source_format=None,
-                original_encoding=None,
-                local_path=None,
-                source_hash=None,
-                status="remote_missing",
-                error=str(error),
-            )
-        except FetchError as error:
-            partial = True
-            update_episode_manifest(
-                manifest,
-                episode=entry.episode,
-                title_slug=slugify(entry.title),
-                transcript_url=_choose_url(entry, source_preference),
-                source_format=None,
-                original_encoding=None,
-                local_path=None,
-                source_hash=None,
-                status="fetch_error",
-                error=str(error),
-            )
-        except ValueError as error:
-            partial = True
-            update_episode_manifest(
-                manifest,
-                episode=entry.episode,
-                title_slug=slugify(entry.title),
-                transcript_url=_choose_url(entry, source_preference),
-                source_format=None,
-                original_encoding=None,
-                local_path=None,
-                source_hash=None,
-                status="parse_error",
-                error=str(error),
-            )
-
-    save_manifest(archive_root, manifest)
+    try:
+        for entry in plan.to_fetch:
+            if dry_run:
+                _emit(
+                    output,
+                    verbose,
+                    f"plan transcript {entry.episode}: {_choose_url(entry, source_preference) or 'no transcript url'}",
+                )
+                update_episode_manifest(
+                    manifest,
+                    episode=entry.episode,
+                    title_slug=slugify(entry.title),
+                    transcript_url=_choose_url(entry, source_preference),
+                    source_format=None,
+                    original_encoding=None,
+                    local_path=None,
+                    source_hash=None,
+                    status="fetch_error",
+                    error="dry-run",
+                )
+                continue
+            try:
+                record, source_hash = fetch_and_parse_entry(
+                    client,
+                    entry,
+                    source_preference,
+                    verbose=verbose,
+                    output=output,
+                )
+                output_path = write_markdown(archive_root, record)
+                update_episode_manifest(
+                    manifest,
+                    episode=record.episode,
+                    title_slug=slugify(record.title),
+                    transcript_url=record.transcript_url,
+                    source_format=record.source_format,
+                    original_encoding=record.original_encoding,
+                    local_path=str(output_path.relative_to(archive_root)),
+                    source_hash=source_hash,
+                    status="present",
+                )
+                _emit(
+                    output,
+                    verbose,
+                    f"stored transcript {record.episode}: {output_path.relative_to(archive_root)}",
+                )
+            except RemoteMissingError as error:
+                partial = True
+                update_episode_manifest(
+                    manifest,
+                    episode=entry.episode,
+                    title_slug=slugify(entry.title),
+                    transcript_url=_choose_url(entry, source_preference),
+                    source_format=None,
+                    original_encoding=None,
+                    local_path=None,
+                    source_hash=None,
+                    status="remote_missing",
+                    error=str(error),
+                )
+                _emit(output, verbose, f"missing transcript {entry.episode}: {error}")
+            except FetchError as error:
+                partial = True
+                update_episode_manifest(
+                    manifest,
+                    episode=entry.episode,
+                    title_slug=slugify(entry.title),
+                    transcript_url=_choose_url(entry, source_preference),
+                    source_format=None,
+                    original_encoding=None,
+                    local_path=None,
+                    source_hash=None,
+                    status="fetch_error",
+                    error=str(error),
+                )
+                _emit(output, verbose, f"fetch error {entry.episode}: {error}")
+            except ValueError as error:
+                partial = True
+                update_episode_manifest(
+                    manifest,
+                    episode=entry.episode,
+                    title_slug=slugify(entry.title),
+                    transcript_url=_choose_url(entry, source_preference),
+                    source_format=None,
+                    original_encoding=None,
+                    local_path=None,
+                    source_hash=None,
+                    status="parse_error",
+                    error=str(error),
+                )
+                _emit(output, verbose, f"parse error {entry.episode}: {error}")
+    finally:
+        save_manifest(archive_root, manifest)
     return (2 if partial else 0), manifest
 
 
-def discover_episode_entries(client: SupportsFetch) -> list[EpisodeIndexEntry]:
+def discover_episode_entries(
+    client: SupportsFetch, *, verbose: int = 0, output: TextIO | None = None
+) -> list[EpisodeIndexEntry]:
+    _emit(output, verbose, f"fetch archive index: {MAIN_ARCHIVE_URL}")
     main_page = client.fetch(MAIN_ARCHIVE_URL)
     main_text, _ = detect_and_decode(main_page.data, main_page.charset)
     urls = [
@@ -165,6 +188,8 @@ def discover_episode_entries(client: SupportsFetch) -> list[EpisodeIndexEntry]:
 
     entries: dict[int, EpisodeIndexEntry] = {}
     for url in urls:
+        if url != MAIN_ARCHIVE_URL:
+            _emit(output, verbose, f"fetch archive index: {url}")
         result = client.fetch(url)
         text, _ = detect_and_decode(result.data, result.charset)
         for entry in parse_archive_entries(url, text):
@@ -183,12 +208,18 @@ def discover_episode_entries(client: SupportsFetch) -> list[EpisodeIndexEntry]:
 
 
 def fetch_and_parse_entry(
-    client: SupportsFetch, entry: EpisodeIndexEntry, source_preference: str
+    client: SupportsFetch,
+    entry: EpisodeIndexEntry,
+    source_preference: str,
+    *,
+    verbose: int = 0,
+    output: TextIO | None = None,
 ) -> tuple[TranscriptRecord, str]:
     urls = _candidate_urls(entry, source_preference)
     last_error: Exception | None = None
     for source_format, url in urls:
         try:
+            _emit(output, verbose, f"fetch transcript {source_format}: {url}")
             result = client.fetch(url)
             text, encoding = detect_and_decode(result.data, result.charset)
             source_hash = hashlib.sha256(result.data).hexdigest()
@@ -260,3 +291,9 @@ def _placeholder_record(entry: EpisodeIndexEntry) -> TranscriptRecord:
     return TranscriptRecord(
         series="Security Now!", episode=entry.episode, title=entry.title, published=None
     )
+
+
+def _emit(output: TextIO | None, verbose: int, message: str) -> None:
+    if verbose <= 0 or output is None:
+        return
+    output.write(f"{message}\n")
