@@ -1,4 +1,24 @@
 #!/usr/bin/env bash
+# bump-version.sh — bump the project version, commit, and apply semver tags.
+#
+# Usage:
+#   scripts/bump-version.sh [patch|minor|major]
+#
+# What it does:
+#   1. Rewrites the version in pyproject.toml, src/sn/version.py,
+#      src/sn/http.py, and BLUEPRINT.md.
+#   2. Stages those four files and creates a commit:
+#        chore: bump version to <new-version>
+#   3. Runs `gitsem <new-version>` via uvx to apply floating semver tags
+#      (e.g. v2, v2.1, v2.1.0) to the new commit.
+#
+# The git tag is always placed on the version-bump commit, never on an
+# earlier commit.  Run this script only when the working tree is clean and
+# all intended changes are already committed.
+#
+# To push the tags after tagging:
+#   uvx --from git+https://github.com/aheimsbakk/gitsem gitsem --push
+
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -15,7 +35,14 @@ patch | minor | major) ;;
 	;;
 esac
 
-uv run python - "$bump_type" <<'PY'
+# Refuse to run with a dirty working tree to keep the tag on the right commit.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+	printf 'error: working tree is not clean. Commit or stash changes first.\n' >&2
+	exit 1
+fi
+
+new_version="$(
+	uv run python - "$bump_type" <<'PY'
 from __future__ import annotations
 
 import re
@@ -61,3 +88,12 @@ replace_version(blueprint_path, r'^- current version: `.*`$', f'- current versio
 
 print(new_version)
 PY
+)"
+
+git add pyproject.toml src/sn/version.py src/sn/http.py BLUEPRINT.md
+git commit -m "chore: bump version to ${new_version}"
+
+uvx --from git+https://github.com/aheimsbakk/gitsem gitsem "${new_version}"
+
+printf 'Version bumped to %s and tagged.\n' "${new_version}"
+printf 'To push tags: uvx --from git+https://github.com/aheimsbakk/gitsem gitsem --push\n'

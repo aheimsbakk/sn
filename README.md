@@ -1,6 +1,8 @@
-# grc
+# sn
 
-`grc` is a Python command-line tool that downloads Security Now transcripts from GRC and stores them as local Markdown files.
+`sn` is a Python command-line tool that downloads Security Now transcripts from GRC and stores them as local Markdown files.
+
+Source: <https://github.com/aheimsbakk/sn>
 
 ## What it does
 
@@ -12,33 +14,34 @@
 
 ## Quick start
 
-1. Create a virtual environment and install the project:
+Sync the two most recent episodes into the current directory:
 
 ```bash
-uv venv
-uv pip install -e .
+uvx --from git+https://github.com/aheimsbakk/sn sn sync --latest 2
 ```
 
-2. Sync the two most recent episodes into the current directory:
+Check archive status:
 
 ```bash
-uv run grc sync --latest 2
-```
-
-3. Check archive status:
-
-```bash
-uv run grc status
+uvx --from git+https://github.com/aheimsbakk/sn sn status
 ```
 
 The tool writes transcript Markdown files directly into the chosen archive directory.
 
 ## Usage
 
+Install the tool for repeated use:
+
+```bash
+uv tool install git+https://github.com/aheimsbakk/sn
+```
+
+After installation, run `sn` directly. For one-off use without installing, replace `sn` with `uvx --from git+https://github.com/aheimsbakk/sn sn` in any command below.
+
 ### Show help
 
 ```bash
-uv run grc --help
+sn --help
 ```
 
 ### Sync transcripts
@@ -46,37 +49,37 @@ uv run grc --help
 Sync the latest five episodes:
 
 ```bash
-uv run grc sync --latest 5
+sn sync --latest 5
 ```
 
 Sync one archive year:
 
 ```bash
-uv run grc sync --year 2005
+sn sync --year 2005
 ```
 
 Sync all discovered years:
 
 ```bash
-uv run grc sync
+sn sync
 ```
 
 Sync into a different archive directory:
 
 ```bash
-uv run grc -d ./archive sync --latest 3
+sn -d ./archive sync --latest 3
 ```
 
 See what would happen without writing files:
 
 ```bash
-uv run grc sync --latest 2 --dry-run
+sn sync --latest 2 --dry-run
 ```
 
 Re-check episodes even if they already exist locally:
 
 ```bash
-uv run grc sync --latest 2 --force
+sn sync --latest 2 --force
 ```
 
 With `--force`, the tool compares a lightweight checksum built from remote metadata headers. If the checksum matches the stored `source_sha`, it skips the full transcript download.
@@ -84,7 +87,7 @@ With `--force`, the tool compares a lightweight checksum built from remote metad
 Prefer HTML transcripts instead of text transcripts:
 
 ```bash
-uv run grc sync --latest 2 --source-preference html
+sn sync --latest 2 --source-preference html
 ```
 
 ### Check archive status
@@ -92,19 +95,19 @@ uv run grc sync --latest 2 --source-preference html
 Show summary counts:
 
 ```bash
-uv run grc status
+sn status
 ```
 
 Show only non-present episodes:
 
 ```bash
-uv run grc status --missing
+sn status --missing
 ```
 
 Get machine-readable output:
 
 ```bash
-uv run grc status --json
+sn status --json
 ```
 
 ## Configuration
@@ -135,13 +138,13 @@ uv run grc status --json
 
 ### Exit codes
 
-#### `grc sync`
+#### `sn sync`
 
 - `0`: all requested work completed successfully
 - `2`: completed with one or more `remote_missing`, `fetch_error`, or `parse_error` results
 - `1`: fatal error
 
-#### `grc status`
+#### `sn status`
 
 - `0`: archive is readable and has no non-present states
 - `2`: archive is readable and contains one or more non-present states
@@ -160,11 +163,13 @@ The tool stores one Markdown file per episode directly in the archive root:
 
 Each file includes YAML front matter with episode metadata followed by the full transcript body.
 
-## Run tests
+## Development
 
-Run the offline test suite with:
+Clone the repository and run the offline test suite:
 
 ```bash
+git clone https://github.com/aheimsbakk/sn
+cd sn
 uv run python -m unittest discover -s tests
 ```
 
@@ -174,12 +179,20 @@ All tests run offline against local fixtures. No test hits the live site.
 
 ### `scripts/bump-version.sh`
 
-Bumps the project version in release files.
+Bumps the project version, commits the change, and applies floating semver tags via `gitsem`.
 
 **Arguments:** `patch`, `minor`, or `major`
 
+The working tree must be clean before running this script. It will refuse to run otherwise, to ensure the tag always lands on the correct commit.
+
 ```bash
 scripts/bump-version.sh minor
+```
+
+After review, push the tags to the remote:
+
+```bash
+uvx --from git+https://github.com/aheimsbakk/gitsem gitsem --push
 ```
 
 ### `scripts/validate-worklog.sh`
