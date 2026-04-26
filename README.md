@@ -51,10 +51,16 @@ Sync the latest five episodes:
 uv run grc sync --latest 5
 ```
 
-Sync a fixed episode range:
+Sync one archive year:
 
 ```bash
-uv run grc sync --from-episode 1000 --to-episode 1005
+uv run grc sync --year 2005
+```
+
+Sync all discovered years:
+
+```bash
+uv run grc sync
 ```
 
 Sync into a different archive directory:
@@ -114,8 +120,7 @@ uv run grc status --json
 
 ### `sync` options
 
-- `--from-episode N`: lower episode bound
-- `--to-episode N`: upper episode bound
+- `--year YYYY`: sync only one archive year; omit it to sync all discovered years
 - `--latest N`: sync only the most recent `N` episodes
 - `--force`: re-check existing episodes and rewrite only when the remote metadata checksum changes
 - `--dry-run`: plan work without writing output files

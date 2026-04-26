@@ -59,3 +59,15 @@ class CliTests(unittest.TestCase):
         mocked.assert_called_once()
         self.assertEqual(mocked.call_args.kwargs["verbose"], 0)
         self.assertIs(mocked.call_args.kwargs["output"], sys.stderr)
+
+    def test_sync_command_supports_year_option(self) -> None:
+        args = cli.build_parser().parse_args(["sync", "--year", "2005"])
+
+        self.assertEqual(args.year, 2005)
+
+    def test_sync_command_removes_episode_range_options(self) -> None:
+        with self.assertRaises(SystemExit):
+            cli.build_parser().parse_args(["sync", "--from-episode", "1000"])
+
+        with self.assertRaises(SystemExit):
+            cli.build_parser().parse_args(["sync", "--to-episode", "1005"])

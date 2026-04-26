@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, TextIO, cast
 
@@ -35,13 +36,10 @@ def plan_sync(
     archive_root: Path,
     *,
     force: bool,
-    from_episode: int | None,
-    to_episode: int | None,
+    year: int | None,
     latest: int | None,
 ) -> SyncPlan:
-    filtered = [
-        entry for entry in entries if _in_range(entry.episode, from_episode, to_episode)
-    ]
+    filtered = [entry for entry in entries if _matches_year(entry, year)]
     if latest is not None:
         filtered = sorted(filtered, key=lambda item: item.episode)[-latest:]
     existing_episodes = archive_state.get("episodes", {})
@@ -65,8 +63,7 @@ def sync_archive(
     archive_root: Path,
     *,
     client: SupportsFetch,
-    from_episode: int | None = None,
-    to_episode: int | None = None,
+    year: int | None = None,
     latest: int | None = None,
     force: bool = False,
     dry_run: bool = False,
@@ -75,14 +72,15 @@ def sync_archive(
     output: TextIO | None = None,
 ) -> tuple[int, dict[str, Any]]:
     archive_state = load_archive_state(archive_root)
-    entries = discover_episode_entries(client, verbose=verbose, output=output)
+    entries = discover_episode_entries(
+        client, year=year, verbose=verbose, output=output
+    )
     plan = plan_sync(
         entries,
         archive_state,
         archive_root,
         force=force,
-        from_episode=from_episode,
-        to_episode=to_episode,
+        year=year,
         latest=latest,
     )
     partial = False
@@ -148,28 +146,33 @@ def sync_archive(
 
 
 def discover_episode_entries(
-    client: SupportsFetch, *, verbose: int = 0, output: TextIO | None = None
+    client: SupportsFetch,
+    *,
+    year: int | None = None,
+    verbose: int = 0,
+    output: TextIO | None = None,
 ) -> list[EpisodeIndexEntry]:
     _emit(output, verbose, f"fetch archive index: {MAIN_ARCHIVE_URL}")
     main_page = client.fetch(MAIN_ARCHIVE_URL)
     main_text, _ = detect_and_decode(main_page.data, main_page.charset)
-    urls = [
-        MAIN_ARCHIVE_URL,
-        *discover_yearly_archive_urls(MAIN_ARCHIVE_URL, main_text),
-    ]
+    yearly_urls = discover_yearly_archive_urls(MAIN_ARCHIVE_URL, main_text)
+    urls = _select_archive_urls(year, yearly_urls)
 
     entries: dict[int, EpisodeIndexEntry] = {}
     for url in urls:
-        if url != MAIN_ARCHIVE_URL:
+        if url == MAIN_ARCHIVE_URL:
+            text = main_text
+        else:
             _emit(output, verbose, f"fetch archive index: {url}")
-        result = client.fetch(url)
-        text, _ = detect_and_decode(result.data, result.charset)
+            result = client.fetch(url)
+            text, _ = detect_and_decode(result.data, result.charset)
         for entry in parse_archive_entries(url, text):
             existing = entries.get(entry.episode)
             if existing is None:
                 entries[entry.episode] = entry
                 continue
             existing.title = entry.title or existing.title
+            existing.year = existing.year or entry.year
             existing.transcript_txt_url = (
                 existing.transcript_txt_url or entry.transcript_txt_url
             )
@@ -256,12 +259,31 @@ def _choose_url(entry: EpisodeIndexEntry, source_preference: str) -> str | None:
     return candidates[0][1] if candidates else None
 
 
-def _in_range(episode: int, from_episode: int | None, to_episode: int | None) -> bool:
-    if from_episode is not None and episode < from_episode:
-        return False
-    if to_episode is not None and episode > to_episode:
-        return False
-    return True
+def _matches_year(entry: EpisodeIndexEntry, year: int | None) -> bool:
+    if year is None:
+        return True
+    entry_year = entry.year or _derive_year(entry)
+    return entry_year == year
+
+
+def _select_archive_urls(year: int | None, yearly_urls: list[str]) -> list[str]:
+    if year is None:
+        return [MAIN_ARCHIVE_URL, *yearly_urls]
+    year_suffix = f"/{year}.htm"
+    for url in yearly_urls:
+        if url.endswith(year_suffix):
+            return [url]
+    if year == datetime.now(UTC).year:
+        return [MAIN_ARCHIVE_URL]
+    return []
+
+
+def _derive_year(entry: EpisodeIndexEntry) -> int | None:
+    if entry.published:
+        match = __import__("re").search(r"(\d{4})", entry.published)
+        if match:
+            return int(match.group(1))
+    return None
 
 
 def _placeholder_record(entry: EpisodeIndexEntry) -> TranscriptRecord:

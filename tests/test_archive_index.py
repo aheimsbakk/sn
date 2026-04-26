@@ -8,7 +8,8 @@ SAMPLE_ARCHIVE = """
   <a href="securitynow.htm">Main</a>
   <a href="sn/sn-1074.txt">SN 1074 transcript</a>
   <a href="sn/sn-1074.htm">SN 1074 HTML</a>
-  <a href="securitynow2025.htm">2025 archive</a>
+  <a href="/sn/past/2025.htm">2025 archive</a>
+  <a href="/sn/past/2005.htm">2005 archive</a>
 </body></html>
 """
 
@@ -18,7 +19,13 @@ class ArchiveIndexTests(unittest.TestCase):
         urls = discover_yearly_archive_urls(
             "https://www.grc.com/securitynow.htm", SAMPLE_ARCHIVE
         )
-        self.assertIn("https://www.grc.com/securitynow2025.htm", urls)
+        self.assertEqual(
+            urls,
+            [
+                "https://www.grc.com/sn/past/2025.htm",
+                "https://www.grc.com/sn/past/2005.htm",
+            ],
+        )
 
     def test_parses_archive_entries(self) -> None:
         entries = parse_archive_entries(

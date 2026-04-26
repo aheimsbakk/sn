@@ -10,7 +10,7 @@ from urllib.request import Request, urlopen
 from .models import FetchResult, RemoteMetadata
 
 
-USER_AGENT = "grc/0.5.0 (+https://www.grc.com/)"
+USER_AGENT = "grc/1.0.0 (+https://www.grc.com/)"
 
 
 @dataclass(slots=True)

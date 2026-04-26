@@ -15,7 +15,8 @@ from grc.sync import (
 
 
 MAIN_URL = "https://www.grc.com/securitynow.htm"
-YEAR_URL = "https://www.grc.com/securitynow2025.htm"
+YEAR_URL = "https://www.grc.com/sn/past/2025.htm"
+YEAR_2005_URL = "https://www.grc.com/sn/past/2005.htm"
 TXT_URL = "https://www.grc.com/sn/sn-1074.txt"
 HTML_URL = "https://www.grc.com/sn/sn-1074.htm"
 
@@ -106,10 +107,10 @@ class SyncTests(unittest.TestCase):
             {
                 MAIN_URL: _result(
                     MAIN_URL,
-                    '<a href="securitynow2025.htm">2025</a><a href="sn/sn-1074.txt">SN 1074 transcript</a>',
+                    '<a href="/sn/past/2025.htm">2025</a><a href="sn/sn-1074.txt">SN 1074 transcript</a>',
                 ),
                 YEAR_URL: _result(
-                    YEAR_URL, '<a href="sn/sn-1074.htm">SN 1074 html</a>'
+                    YEAR_URL, '<a href="/sn/sn-1074.htm">SN 1074 html</a>'
                 ),
             }
         )
@@ -117,6 +118,23 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0].episode, 1074)
         self.assertEqual(entries[0].transcript_html_url, HTML_URL)
+
+    def test_discover_episode_entries_fetches_old_yearly_archives(self) -> None:
+        old_txt_url = "https://www.grc.com/sn/sn-0010.txt"
+        client = FakeClient(
+            {
+                MAIN_URL: _result(MAIN_URL, '<a href="/sn/past/2005.htm">2005</a>'),
+                YEAR_2005_URL: _result(
+                    YEAR_2005_URL, '<a href="/sn/sn-0010.txt">SN 10 transcript</a>'
+                ),
+            }
+        )
+
+        entries = discover_episode_entries(client)
+
+        self.assertEqual([entry.episode for entry in entries], [10])
+        self.assertEqual(entries[0].transcript_txt_url, old_txt_url)
+        self.assertEqual(client.calls, [MAIN_URL, YEAR_2005_URL])
 
     def test_fetch_and_parse_falls_back_to_html(self) -> None:
         entry = EpisodeIndexEntry(
@@ -153,12 +171,30 @@ class SyncTests(unittest.TestCase):
                 archive_state,
                 root,
                 force=False,
-                from_episode=None,
-                to_episode=None,
+                year=None,
                 latest=None,
             )
             self.assertEqual(plan.to_fetch, [])
             self.assertEqual(plan.skipped_existing, [1074])
+
+    def test_plan_sync_filters_to_selected_year(self) -> None:
+        entries = [
+            EpisodeIndexEntry(episode=10, title="Episode 10", published="2005-08-11"),
+            EpisodeIndexEntry(
+                episode=1074, title="Episode 1074", published="2026-04-14"
+            ),
+        ]
+
+        plan = plan_sync(
+            entries,
+            {"episodes": {}},
+            Path("/tmp/archive"),
+            force=False,
+            year=2005,
+            latest=None,
+        )
+
+        self.assertEqual([entry.episode for entry in plan.to_fetch], [10])
 
     def test_sync_archive_returns_partial_when_missing(self) -> None:
         class MissingClient(FakeClient):

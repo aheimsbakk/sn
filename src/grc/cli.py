@@ -27,8 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     sync_parser = subparsers.add_parser("sync")
-    sync_parser.add_argument("--from-episode", type=int)
-    sync_parser.add_argument("--to-episode", type=int)
+    sync_parser.add_argument("--year", type=int)
     sync_parser.add_argument("--latest", type=int)
     sync_parser.add_argument("--force", action="store_true")
     sync_parser.add_argument("--dry-run", action="store_true")
@@ -62,8 +61,7 @@ def main(argv: list[str] | None = None) -> int:
         exit_code, archive_state = sync_archive(
             archive_root,
             client=client,
-            from_episode=args.from_episode,
-            to_episode=args.to_episode,
+            year=args.year,
             latest=args.latest,
             force=args.force,
             dry_run=args.dry_run,

@@ -249,10 +249,9 @@ grc status
 
 ### `grc sync` options
 
-- `--from-episode N`
-  - optional lower bound
-- `--to-episode N`
-  - optional upper bound
+- `--year YYYY`
+  - sync only one archive year
+  - when omitted, sync should discover and check all archive years linked from the front page
 - `--latest N`
   - sync only the most recent N episodes
 - `--force`
@@ -470,7 +469,7 @@ Prefer standard library functionality by default, but use `lxml` and `PyYAML` wh
 
 - build backend: `setuptools`
 - package name: `grc`
-- current version: `0.5.0`
+- current version: `1.0.0`
 - editable install works with `uv pip install -e .`
 - tests run with `uv run python -m unittest discover -s tests`
 
@@ -600,7 +599,7 @@ These files were fetched politely from `grc.com` and are used only for offline t
 Build working `grc sync` and `grc status` commands that can:
 
 - install with `uv`
-- sync a selected range of episodes
+- sync a selected archive year or all discovered years
 - store UTF-8 Markdown transcripts in a chosen directory
 - run offline tests from fixtures only
 - avoid unnecessary load on `grc.com`

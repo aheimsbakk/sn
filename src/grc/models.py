@@ -13,6 +13,7 @@ class EpisodeIndexEntry:
     transcript_txt_url: str | None = None
     transcript_html_url: str | None = None
     archive_url: str | None = None
+    year: int | None = None
     published: str | None = None
     description: str | None = None
 
