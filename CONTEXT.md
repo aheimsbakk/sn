@@ -2,11 +2,11 @@
 
 ## Project status
 
-Greenfield project. No application code exists yet.
+Phase 1 scaffold exists. The package, CLI, core sync modules, and offline tests are in place.
 
 ## Current goal
 
-Build a Python CLI named `grc`.
+Build out the Python CLI named `grc` from the Phase 1 archive plan.
 
 Phase 1 includes:
 
@@ -34,6 +34,30 @@ Phase 1 includes:
 - existing archived transcripts are only refreshed with `--force`
 - title slug length is capped at 32 characters and filenames always include the episode number
 - sync timeout, retry count, and backoff have defaults and are configurable
+
+## Implemented now
+
+- `pyproject.toml` with `setuptools` build backend and `uv`-friendly editable install
+- distribution package name `grc` so `uvx grc` works without `--from`
+- tests run directly with `uv run python -m unittest discover -s tests`
+- supported package `grc` under `src/`
+- `grc sync` argument parsing and orchestration flow
+- `grc status` text and JSON output
+- polite HTTP client with user agent, timeout, pause, and retry support
+- archive index parsing for main and yearly pages
+- text transcript parsing with header alias support
+- HTML transcript fallback parsing
+- Markdown writer with YAML front matter
+- manifest storage in `.grc-sync/manifest.json`
+- offline `unittest` coverage for core modules
+- real offline fixtures downloaded from GRC for episodes 1000 and 1074 plus the main archive page
+
+## Known gaps
+
+- no `__main__.py` module yet; the supported entry point is the `grc` console script
+- no yearly archive fixture yet; current real fixture coverage uses the main archive page plus two real episodes
+- sync output is minimal and does not yet expose verbose logging detail
+- HTML parsing is intentionally conservative and may need refinement against real pages
 
 ## Metadata decision
 

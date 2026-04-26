@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grc"
+version = "0.2.0"
+description = "Security Now transcript archiver"
+readme = "BLUEPRINT.md"
+requires-python = ">=3.12"
+dependencies = [
+  "lxml==5.4.0",
+  "PyYAML==6.0.2",
+]
+
+[project.scripts]
+grc = "grc.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

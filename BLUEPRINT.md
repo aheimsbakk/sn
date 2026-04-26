@@ -411,16 +411,14 @@ This avoids stuffing sync-only data into Markdown front matter.
 
 ---
 
-## Planned Python package layout
+## Python package layout
 
 ```text
 src/
-  grc_sync/
+  grc/
     __init__.py
-    __main__.py
     cli.py
     version.py
-    logging.py
     models.py
     archive_index.py
     http.py
@@ -441,6 +439,7 @@ tests/
   test_html_parser.py
   test_normalize.py
   test_markdown_writer.py
+  test_manifest.py
   test_sync.py
   test_status.py
 ```
@@ -458,6 +457,11 @@ tests/
 - `sync.py`: orchestration only
 - `status.py`: summarize local archive coverage and missing transcripts
 
+Notes:
+
+- `__main__.py` is not required in v1 because the console entry point is `grc`
+- dedicated logging helpers are deferred until real sync logging needs appear
+
 ---
 
 ## Packaging plan
@@ -465,7 +469,7 @@ tests/
 - project managed by `uv`
 - standard `pyproject.toml`
 - console script entry point named `grc`
-- package import name: `grc_sync`
+- package import name: `grc`
 
 ### Planned runtime stack
 
@@ -477,6 +481,14 @@ tests/
 - standard library `json`, `pathlib`, `dataclasses`, `re`, and `logging`
 
 Prefer standard library functionality by default, but use `lxml` and `PyYAML` where they clearly reduce complexity and improve output quality.
+
+### Implemented packaging details
+
+- build backend: `setuptools`
+- package name: `grc`
+- current version: `0.2.0`
+- editable install works with `uv pip install -e .`
+- tests run with `uv run python -m unittest discover -s tests`
 
 ### Planned test stack
 
@@ -534,7 +546,7 @@ When source transcripts include copyright or Creative Commons text, preserve tha
 
 ## Tests
 
-Tests must be offline and fixture-driven.
+Tests are offline. The suite now includes committed real GRC fixtures under `tests/fixtures/` plus focused inline samples for edge cases.
 
 ### Required fixture set
 
@@ -545,6 +557,16 @@ Tests must be offline and fixture-driven.
 - one archive index page
 - one yearly archive page
 - one sample with non-UTF-8 bytes
+
+### Implemented real fixture set in v1
+
+- `tests/fixtures/archive/securitynow-main.htm`
+- `tests/fixtures/transcripts/sn-1000.txt`
+- `tests/fixtures/transcripts/sn-1000.htm`
+- `tests/fixtures/transcripts/sn-1074.txt`
+- `tests/fixtures/transcripts/sn-1074.htm`
+
+These files were fetched politely from `grc.com` and are used only for offline tests.
 
 ### Required coverage
 
@@ -560,6 +582,20 @@ Tests must be offline and fixture-driven.
 - status command output
 - exit code behavior
 - distinction between `remote_missing`, `fetch_error`, and `parse_error`
+
+### Implemented coverage in v1
+
+- CLI parsing and status rendering
+- archive discovery across main and yearly pages
+- text transcript parsing, header aliases, and license capture
+- HTML fallback parsing
+- real archive and transcript parsing against downloaded GRC fixtures
+- encoding fallback to `cp1252`
+- Markdown output and target path generation
+- manifest persistence
+- incremental sync planning
+- sync fallback from text to HTML when text parsing fails
+- partial exit behavior for missing transcripts
 
 ---
 
